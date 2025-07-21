@@ -10,6 +10,7 @@ import {
   Sparkles,
   CheckSquare as CheckSquareIcon,
 } from "lucide-react";
+import { Session } from 'next-auth';
 
 const ThreeScene = () => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -100,7 +101,7 @@ type SelectedAction = {
   sender: string;
 };
 
-const Header = ({ session }: { session: any }) => (
+const Header = ({ session }: { session: Session | null }) => (
   <motion.header
     initial={{ y: -100 }}
     animate={{ y: 0 }}
@@ -173,7 +174,7 @@ const HeroSection = () => (
         transition={{ duration: 0.5, delay: 0.1 }}
         className="inline-block px-4 py-1 mb-4 text-sm font-medium text-violet-700 bg-violet-100 rounded-full"
       >
-         Powered by AI
+        ✨ Powered by AI
       </motion.div>
       <motion.h1
         initial={{ opacity: 0, y: 20 }}
@@ -393,9 +394,10 @@ export default function Home() {
       }
       const data = await response.json();
       setTodoList(data);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message);
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+        console.error(err);
+        setError(errorMessage);
     } finally {
       setIsTodoListLoading(false);
     }
@@ -424,8 +426,9 @@ export default function Home() {
       } else {
         alert("No new emails with content found to analyze.");
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+        setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -464,8 +467,9 @@ export default function Home() {
       await fetchTodos();
       setAnalysisResults([]);
       setSelectedActions(new Map());
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+        setError(errorMessage);
     }
   };
 
@@ -481,9 +485,10 @@ export default function Home() {
         body: JSON.stringify({ id: todoId }),
       });
       if (!response.ok) throw new Error("Failed to mark as done.");
-    } catch (err: any) {
-      setError(err.message);
-      setTodoList(originalTodoList);
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+        setError(errorMessage);
+        setTodoList(originalTodoList);
     }
   };
 
