@@ -1,9 +1,24 @@
-import { getServerSession } from "next-auth/next";
+import { getServerSession, Session } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
-function base64UrlDecode(str: string) {
+interface GmailPayload {
+  body?: { data?: string };
+  parts?: GmailPart[];
+}
+
+interface GmailPart {
+  mimeType: string;
+  body: { data?: string };
+  parts?: GmailPart[];
+}
+
+interface CustomSession extends Session {
+  accessToken?: string;
+}
+
+function base64UrlDecode(str: string): string {
   if (!str) return "";
   str = str.replace(/-/g, "+").replace(/_/g, "/");
   while (str.length % 4) {
@@ -12,14 +27,12 @@ function base64UrlDecode(str: string) {
   return Buffer.from(str, "base64").toString("utf-8");
 }
 
-function getEmailBody(payload: any): string {
+function getEmailBody(payload: GmailPayload): string {
   if (payload.body?.data) {
     return base64UrlDecode(payload.body.data);
   }
   const parts = payload.parts || [];
-  const plainTextPart = parts.find(
-    (part: any) => part.mimeType === "text/plain"
-  );
+  const plainTextPart = parts.find((part) => part.mimeType === "text/plain");
   if (plainTextPart) {
     return base64UrlDecode(plainTextPart.body.data);
   }
@@ -38,7 +51,6 @@ async function processSingleEmail(
   apiKey: string
 ) {
   const { from, subject, body } = emailData;
-
   const prompt = `Analyze the following email from "${from}" with the subject "${subject}".
 Provide a response as a single, valid JSON object with three keys:
 1. "sender": The name of the sender.
@@ -73,11 +85,11 @@ ${body}`;
 }
 
 export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session: CustomSession | null = await getServerSession(authOptions);
+  if (!session?.accessToken)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const accessToken = (session as any).accessToken;
+  const accessToken = session.accessToken;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey)
     return NextResponse.json(
@@ -87,10 +99,10 @@ export async function POST() {
 
   try {
     const client = await clientPromise;
-    const db = client.db("MailSyncDB");
+    const db = client.db("inboxIntelDB");
     const allTodos = await db
       .collection("todos")
-      .find({ userEmail: session.user.email })
+      .find({ userEmail: session.user?.email })
       .toArray();
     const existingTodoTexts = allTodos.map((todo) => todo.text);
 
@@ -149,11 +161,13 @@ export async function POST() {
         const emailDetails = await emailDetailsResponse.json();
 
         const fromHeader =
-          emailDetails.payload.headers.find((h: any) => h.name === "From")
-            ?.value || "Unknown Sender";
+          emailDetails.payload.headers.find(
+            (h: { name: string }) => h.name === "From"
+          )?.value || "Unknown Sender";
         const subjectHeader =
-          emailDetails.payload.headers.find((h: any) => h.name === "Subject")
-            ?.value || "No Subject";
+          emailDetails.payload.headers.find(
+            (h: { name: string }) => h.name === "Subject"
+          )?.value || "No Subject";
 
         const body = getEmailBody(emailDetails.payload);
 
@@ -171,8 +185,10 @@ export async function POST() {
       (r) => r !== null
     );
     return NextResponse.json({ results });
-  } catch (error: any) {
-    console.error("Error in /api/summarize:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    console.error("Error in /api/summarize:", errorMessage);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
