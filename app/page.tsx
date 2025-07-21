@@ -174,7 +174,7 @@ const HeroSection = () => (
         transition={{ duration: 0.5, delay: 0.1 }}
         className="inline-block px-4 py-1 mb-4 text-sm font-medium text-violet-700 bg-violet-100 rounded-full"
       >
-        ✨ Powered by AI
+         Powered by AI
       </motion.div>
       <motion.h1
         initial={{ opacity: 0, y: 20 }}
