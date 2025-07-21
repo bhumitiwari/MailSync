@@ -1,5 +1,6 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../../lib/auth";
+
+import { getServerSession, Session } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -7,23 +8,26 @@ import { ObjectId } from "mongodb";
 const DB_NAME = "MailSyncDB";
 const COLLECTION_NAME = "todos";
 
+
+
 export async function GET() {
-  const session = await getServerSession(authOptions);
+  const session: Session | null = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userEmail = session.user.email;
 
   try {
     const client = await clientPromise;
     const db = client.db(DB_NAME);
     const todos = await db
       .collection(COLLECTION_NAME)
-      .find({ userEmail: session.user.email, isDone: false })
+      .find({ userEmail: userEmail, isDone: false })
       .sort({ createdAt: -1 })
       .toArray();
 
     console.log(
-      `[GET /api/todo] Found ${todos.length} items for ${session.user.email}`
+      `[GET /api/todo] Found ${todos.length} items for ${userEmail}`
     );
     return NextResponse.json(todos);
   } catch (error) {
@@ -36,10 +40,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session: Session | null = await getServerSession(authOptions);
+  
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+ 
+  const userEmail = session.user.email;
 
   try {
     const { items }: { items: { text: string; sender: string }[] } =
@@ -49,14 +56,14 @@ export async function POST(request: Request) {
     }
 
     console.log(
-      `[POST /api/todo] Attempting to add ${items.length} items for ${session.user.email}`
+      `[POST /api/todo] Attempting to add ${items.length} items for ${userEmail}`
     );
 
     const client = await clientPromise;
     const db = client.db(DB_NAME);
 
     const newTodos = items.map((item) => ({
-      userEmail: session.user.email,
+      userEmail: userEmail, 
       text: item.text,
       sender: item.sender,
       isDone: false,
@@ -81,10 +88,11 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session: Session | null = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userEmail = session.user.email;
 
   try {
     const { id } = await request.json();
@@ -101,7 +109,7 @@ export async function PATCH(request: Request) {
     const result = await db
       .collection(COLLECTION_NAME)
       .updateOne(
-        { _id: new ObjectId(id), userEmail: session.user.email },
+        { _id: new ObjectId(id), userEmail: userEmail },
         { $set: { isDone: true } }
       );
 

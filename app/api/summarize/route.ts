@@ -1,5 +1,5 @@
 import { getServerSession, Session } from "next-auth";
-import { authOptions } from "../../../lib/auth";
+import { authOptions } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
@@ -33,9 +33,11 @@ function getEmailBody(payload: GmailPayload): string {
   }
   const parts = payload.parts || [];
   const plainTextPart = parts.find((part) => part.mimeType === "text/plain");
-  if (plainTextPart) {
+
+  if (plainTextPart && plainTextPart.body.data) {
     return base64UrlDecode(plainTextPart.body.data);
   }
+
   for (const part of parts) {
     if (part.parts) {
       const foundBody = getEmailBody(part);
